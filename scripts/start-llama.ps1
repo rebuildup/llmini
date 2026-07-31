@@ -1,4 +1,3 @@
-
 $ErrorActionPreference = "Stop"
 . "$PSScriptRoot\lib\Common.ps1"
 
@@ -8,7 +7,6 @@ $secrets = Get-StackSecrets
 $root = Get-StackRoot
 
 $llamaDirectory = Get-LlamaCppDirectory
-
 $server = Join-Path $llamaDirectory "llama-server.exe"
 $model = Join-Path $root "models\$($settings.Model.FileName)"
 
@@ -17,6 +15,45 @@ if (-not (Test-Path $server)) {
 }
 if (-not (Test-Path $model)) {
     throw "Model is missing: $model. Run bootstrap.cmd."
+}
+
+$existingServer = Get-ManagedProcess "llama-server"
+if ($existingServer) {
+    $propsUrl = "$(Get-LlamaBaseUrl)/props"
+    $propsHeaders = @{ Authorization = "Bearer $($secrets.LlamaApiKey)" }
+    $restartExistingServer = $false
+
+    try {
+        $props = Invoke-RestMethod `
+            -Method Get `
+            -Uri $propsUrl `
+            -Headers $propsHeaders `
+            -TimeoutSec 5
+
+        $runningContext = [int]$props.default_generation_settings.n_ctx
+
+        if ($runningContext -ne [int]$settings.Model.ContextLength) {
+            Write-Host (
+                "Restarting llama-server: running context {0}, configured context {1}." -f
+                $runningContext,
+                $settings.Model.ContextLength
+            )
+            $restartExistingServer = $true
+        }
+    }
+    catch {
+        Write-Warning (
+            "The managed llama-server did not answer /props and will be restarted: {0}" -f
+            $_.Exception.Message
+        )
+        $restartExistingServer = $true
+    }
+
+    if ($restartExistingServer) {
+        Stop-ManagedProcess "hermes-gateway"
+        Stop-ManagedProcess "openclaw-gateway"
+        Stop-ManagedProcess "llama-server"
+    }
 }
 
 $serverArguments = @(
