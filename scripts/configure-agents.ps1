@@ -1,4 +1,3 @@
-
 $ErrorActionPreference = "Stop"
 . "$PSScriptRoot\lib\Common.ps1"
 
@@ -7,6 +6,16 @@ $settings = Get-StackSettings
 $secrets = Get-StackSecrets
 $root = Get-StackRoot
 $baseUrl = "$(Get-LlamaBaseUrl)/v1"
+$hermesMinimumContext = 64000
+
+if ($settings.Hermes.Enabled -and
+    [int]$settings.Model.ContextLength -lt $hermesMinimumContext) {
+    throw (
+        "Hermes requires at least {0} context tokens. Current setting: {1}." -f
+        $hermesMinimumContext,
+        $settings.Model.ContextLength
+    )
+}
 
 if ($settings.OpenClaw.Enabled) {
     $stateDir = Join-Path $root "state\openclaw"
@@ -72,12 +81,20 @@ if ($settings.OpenClaw.Enabled) {
 
     $json = $config | ConvertTo-Json -Depth 12
     $configPath = Join-Path $stateDir "openclaw.json"
-    [System.IO.File]::WriteAllText($configPath, $json, (New-Object System.Text.UTF8Encoding($false)))
+    [System.IO.File]::WriteAllText(
+        $configPath,
+        $json,
+        (New-Object System.Text.UTF8Encoding($false))
+    )
 
     $envText = @"
 OPENCLAW_GATEWAY_TOKEN=$($secrets.OpenClawGatewayToken)
 "@
-    [System.IO.File]::WriteAllText((Join-Path $stateDir ".env"), $envText, (New-Object System.Text.UTF8Encoding($false)))
+    [System.IO.File]::WriteAllText(
+        (Join-Path $stateDir ".env"),
+        $envText,
+        (New-Object System.Text.UTF8Encoding($false))
+    )
     Write-Host "Generated OpenClaw config: $configPath"
 }
 
@@ -103,7 +120,11 @@ api_server:
   allow_model_override: false
   max_concurrent: 1
 "@
-    [System.IO.File]::WriteAllText((Join-Path $hermesHome "config.yaml"), $yaml, (New-Object System.Text.UTF8Encoding($false)))
+    [System.IO.File]::WriteAllText(
+        (Join-Path $hermesHome "config.yaml"),
+        $yaml,
+        (New-Object System.Text.UTF8Encoding($false))
+    )
 
     $envText = @"
 API_SERVER_ENABLED=true
@@ -111,6 +132,10 @@ API_SERVER_HOST=$($settings.Hermes.ApiHost)
 API_SERVER_PORT=$($settings.Hermes.ApiPort)
 API_SERVER_KEY=$($secrets.HermesApiKey)
 "@
-    [System.IO.File]::WriteAllText((Join-Path $hermesHome ".env"), $envText, (New-Object System.Text.UTF8Encoding($false)))
+    [System.IO.File]::WriteAllText(
+        (Join-Path $hermesHome ".env"),
+        $envText,
+        (New-Object System.Text.UTF8Encoding($false))
+    )
     Write-Host "Generated Hermes config: $(Join-Path $hermesHome 'config.yaml')"
 }
