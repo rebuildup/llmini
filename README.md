@@ -1,253 +1,93 @@
-# Local AI Stack for Windows
+# llmini
 
-RTX 4050 Laptop / RAM 32GB 前後のWindows PCを想定した、単一ディレクトリ完結型のローカルLLM構成です。
+Windows上でローカルLLMを最小構成・低オーバーヘッドで動かすための、`llama.cpp`専用ランナーです。
 
-- 推論: `llama.cpp` CUDA 12.4版の `llama-server`
-- 既定モデル: `Qwen3.5-4B Q6_K`（GGUF）
-- API: OpenAI互換 `http://127.0.0.1:8080/v1`
-- エージェント: OpenClaw / Hermes Agent
-- 管理: PowerShell + 薄い `.cmd`
-- 自動起動: Windowsタスクスケジューラ
-- Git追跡: 設定・スクリプト・ドキュメントのみ
-- Linux/WSLは不使用
+含まれるものは次だけです。
 
-## 1. 配置
+- CUDA版`llama-server.exe`
+- GGUFモデル1個
+- 起動・停止・状態確認・更新用のPowerShellスクリプト
+- OpenAI互換APIの接続手順
 
-ZIPを、空白を含まないDドライブ上のパスへ展開してください。
+OpenClaw、Hermes Agent、Ollama、LM Studio、Node.js、Python、WSL、NixOSは使用しません。推論時の主要プロセスは`llama-server.exe`だけです。
 
-```text
-D:\local-ai-stack
-```
-
-このリポジトリ内のスクリプトは展開先を自動検出するため、ドライブ文字やディレクトリ名をハードコードしていません。
-
-## 2. 初回構築
-
-PowerShell 5.1以上で実行できます。
+## セットアップ
 
 ```powershell
-cd D:\local-ai-stack
+cd D:\6_llm
 .\bootstrap.cmd
 ```
 
-初回構築では、次をこのディレクトリ配下へ取得します。
+初回のみ、最新のWindows CUDA 12.4版`llama.cpp`と既定GGUFを取得します。完了後はAPIテストまで実行します。
 
-1. Portable Node.js 24
-2. 最新のWindows x64 / CUDA 12.4版 llama.cpp
-3. CUDAランタイムDLL
-4. Qwen3.5-4B Q6_K GGUF
-5. OpenClawのローカルnpmインストール
-6. Hermes AgentのWindowsネイティブ環境
-7. 両エージェント用のローカルモデル設定
-
-モデルを含め、数GBをダウンロードします。再実行時は既存ファイルを再利用します。
-
-個別に省略する場合:
+## 日常操作
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\bootstrap.ps1 -SkipHermes
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\bootstrap.ps1 -SkipOpenClaw
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\bootstrap.ps1 -SkipModel
+.\start.cmd
+.\stop.cmd
+.\status.cmd
+.\test.cmd
+.\benchmark.cmd
 ```
 
-## 3. 日常操作
+- `start.cmd`: バックグラウンド起動
+- `stop.cmd`: 停止
+- `status.cmd`: PID、API、GPU使用状況を表示
+- `test.cmd`: Chat Completions APIへ1回送信
+- `benchmark.cmd`: 短いコード生成テストとtoken/s表示
 
-```text
-start.cmd       設定されたコンポーネントを起動
-stop.cmd        管理対象プロセスを停止
-status.cmd      プロセス・API・GPU状態を確認
-test.cmd        モデルAPIへテスト送信
-benchmark.cmd   短い推論ベンチマーク
-openclaw.cmd    OpenClaw CLIを正しいローカル環境で実行
-hermes.cmd      Hermes CLIを正しいローカル環境で実行
-```
-
-既定の `start.cmd` は `config/settings.psd1` の `StartupComponents` に従います。初期値は `llama` のみです。
-
-OpenClaw Gatewayを手動起動:
+## 更新
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\start-openclaw.ps1
+.\update.cmd
 ```
 
-Hermes Gatewayを手動起動:
+`llama.cpp`だけを最新版へ更新します。モデルは自動更新しません。
+
+## 自動起動
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\start-hermes.ps1
-```
-
-## 4. 自動起動
-
-現在の `StartupComponents` を、ログオン時に起動するタスクとして登録します。
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\register-startup.ps1
+.\register-startup.cmd
 ```
 
 解除:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\unregister-startup.ps1
+.\unregister-startup.cmd
 ```
 
-初期状態ではモデルサーバーだけが自動起動します。OpenClawやHermesも起動する場合は、`config/settings.psd1`を次のように変更してから再登録してください。
+ログオン時に`llama-server`だけを起動します。
+
+## 旧構成の削除
+
+旧版から移行する場合は、更新後に旧プロセスと生成物を削除してから新構成を作ります。
+
+完全版ZIPを`D:\6_llm`へ上書き展開してから実行します。
 
 ```powershell
-StartupComponents = @("llama", "openclaw", "hermes")
+.\cleanup-legacy.cmd
+.\bootstrap.cmd
+git add -A
+git commit -m "refactor: reduce llmini to llama.cpp only"
+git push origin master
 ```
 
-## 5. Git管理
+`cleanup-legacy.cmd`はOpenClaw、Hermes Agent、Portable Node.js、旧llama.cpp、関連ログ・状態・ワークスペース、旧自動起動タスクを削除します。GGUFが入っている`models`は残します。旧エージェントの履歴やワークスペースも削除対象です。
 
-初期化:
+## 設定
 
-```powershell
-git init
-git add .
-git commit -m "Initialize local AI stack"
-```
-
-追跡対象:
-
-- `config/settings.psd1`
-- `scripts/`
-- `.cmd`
-- ドキュメント
-
-追跡しないもの:
-
-- モデル
-- llama.cpp / Node / OpenClaw / Hermes本体
-- APIキー
-- PID
-- ログ
-- セッション
-- エージェントの記憶
-- 作業用ワークスペース
-
-実際のエージェント設定は、追跡中の `settings.psd1` と生成スクリプトから `state/` へ生成します。
-
-設定を再生成:
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\configure-agents.ps1
-```
-
-`state/`内を直接編集した内容は、再生成時に上書きされます。永続化したい変更は設定生成スクリプト側へ反映してください。
-
-## 6. 性能設定
-
-初期値:
+`config/settings.psd1`だけを編集します。既定値はRTX 4050 Laptop 6GBで速度と余裕を両立する構成です。
 
 ```text
-Context:             8192
-Max output:          2048
-GPU layers:          999（可能な限りGPU）
-CPU threads:         4
-Prompt threads:      6
-Parallel requests:   1
-KV cache:            Q8_0
-Process priority:    BelowNormal
-llama.cpp poll:      0
+Model:           Qwen3.5-4B Q6_K
+Context:         8192
+GPU layers:      all
+Parallel:        1
+KV cache:        Q8_0
+Flash Attention: on
+Process priority: Normal
 ```
 
-生成中のGPU使用率を厳密に50%へ固定する設定ではありません。小型モデルをGPU上で早く終わらせ、CPUスレッド数とプロセス優先度を抑える構成です。
+長いcontextが必要なときだけ`ContextLength`を増やしてください。contextを大きくすると起動時と実行時のメモリ消費が増えます。
 
-設定変更は `config/settings.psd1` で行います。
-
-## 7. ディレクトリ
-
-```text
-local-ai-stack/
-├─ apps/                  ダウンロードされたOpenClaw
-├─ config/                Git管理する唯一の主要設定
-├─ models/                GGUF（Git対象外）
-├─ scripts/               管理スクリプト
-├─ state/                 秘密値、PID、エージェント状態（Git対象外）
-├─ tools/                 Node、llama.cpp（Git対象外）
-├─ workspace/             エージェント作業領域（Git対象外）
-├─ logs/                  標準出力・標準エラー（Git対象外）
-└─ downloads/             ダウンロードキャッシュ（Git対象外）
-```
-
-## 8. 接続先
-
-### llama-server
-
-```text
-Base URL: http://127.0.0.1:8080/v1
-Model ID: qwen3.5-4b-local
-API key: state\secrets.psd1 内で自動生成
-```
-
-OpenClawとHermesは、初回構築時にこの値へ自動設定されます。
-
-### OpenClaw
-
-状態:
-
-```text
-state\openclaw
-```
-
-CLI:
-
-```powershell
-.\openclaw.cmd doctor
-.\openclaw.cmd models list
-.\openclaw.cmd gateway status
-```
-
-### Hermes Agent
-
-状態・インストール:
-
-```text
-state\hermes
-```
-
-CLI:
-
-```powershell
-.\hermes.cmd doctor
-.\hermes.cmd chat
-.\hermes.cmd gateway
-```
-
-HermesのOpenAI互換Agent APIを有効化しているため、Gateway起動中は次も利用できます。
-
-```text
-http://127.0.0.1:8642/v1
-```
-
-## 9. 更新
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\update.ps1
-```
-
-更新対象:
-
-- llama.cpp
-- OpenClaw
-- Hermes Agent
-
-モデルは自動更新しません。量子化やモデルを変える場合は `config/settings.psd1` のURL・ファイル名・IDを変更し、次を実行します。
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\download-model.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\configure-agents.ps1
-```
-
-## 10. NixOSを使わない理由
-
-この構成では、llama.cpp、OpenClaw、Hermes AgentのすべてがWindowsネイティブで動作します。NixOS VMやWSLを挟むと、RTX Laptop GPUの受け渡し、localhost接続、ファイル権限、常駐管理が増え、今回の「低レイヤー・単一ディレクトリ・低オーバーヘッド」という目的に反します。
-
-将来、別PCのNixOSサーバーへエージェント部分だけ移す場合の方針は `nixos/README.md` に記載しています。
-
-## 11. セキュリティ
-
-- すべて初期状態で `127.0.0.1` のみにバインドします。
-- エージェントはコマンド実行やファイル操作が可能です。
-- `workspace/`以外を操作させる場合は、各エージェントの承認・サンドボックス設定を確認してください。
-- `state/`をGitへ追加しないでください。
-- 外部公開する場合は、この構成をそのまま使わず、認証・TLS・ファイアウォールを再設計してください。
+API利用方法は[API.md](API.md)を参照してください。

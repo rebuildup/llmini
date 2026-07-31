@@ -1,24 +1,8 @@
-# Downloaded runtimes and packages
-/apps/*
-!/apps/.gitkeep
-/tools/*
-!/tools/.gitkeep
-/models/*
-!/models/.gitkeep
-/downloads/*
-!/downloads/.gitkeep
-
-# Runtime state, credentials, sessions, memory and generated configs
-/state/*
-!/state/.gitkeep
-
-# Agent workspace and outputs
-/workspace/*
-!/workspace/.gitkeep
-/logs/*
-!/logs/.gitkeep
-
-# PowerShell / editor
+/bin/
+/cache/
+/models/
+/logs/
+/state/
 *.tmp
 *.partial
 *.log
