@@ -10,11 +10,35 @@ $ErrorActionPreference = "Stop"
 $settings = Get-StackSettings
 $secrets = Get-StackSecrets
 $baseUrl = "http://$($settings.Hermes.ApiHost):$($settings.Hermes.ApiPort)"
+$llamaBaseUrl = Get-LlamaBaseUrl
 $headers = @{ Authorization = "Bearer $($secrets.HermesApiKey)" }
+$llamaHeaders = @{ Authorization = "Bearer $($secrets.LlamaApiKey)" }
+$minimumContext = 64000
 
 Write-Host "Hermes Agent verification"
 Write-Host ("  API base: {0}/v1" -f $baseUrl)
 Write-Host "  Browser UI: none; Hermes exposes an OpenAI-compatible API."
+
+Write-Host ""
+Write-Host "llama-server context probe"
+$props = Invoke-RestMethod `
+    -Method Get `
+    -Uri "$llamaBaseUrl/props" `
+    -Headers $llamaHeaders `
+    -TimeoutSec 10
+
+$serverContext = [int]$props.default_generation_settings.n_ctx
+Write-Host ("  Reported context: {0}" -f $serverContext)
+Write-Host ("  Hermes minimum:  {0}" -f $minimumContext)
+
+if ($serverContext -lt $minimumContext) {
+    throw (
+        "llama-server is running with context {0}, below the Hermes minimum {1}. " +
+        "Run repair-integrations.cmd to update settings and restart the stack." -f
+        $serverContext,
+        $minimumContext
+    )
+}
 
 Write-Host ""
 Write-Host "Health probe"
