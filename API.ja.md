@@ -1,21 +1,20 @@
-# API connection
+# API接続
 
-[日本語](API.ja.md)
+[English](API.md)
 
-`llmini` exposes the HTTP API provided directly by `llama-server`.
+`llmini`は`llama-server`が提供するHTTP APIを、そのまま公開します。
 
 ```text
 Base URL: http://127.0.0.1:8080/v1
 Model ID: qwen3.5-4b-local
-API key:  not required
+API key:  不要
 ```
 
-Some OpenAI-compatible clients require a non-empty API-key field. Use any local
-placeholder such as `local`; the default server configuration does not validate it.
+OpenAI互換クライアントによってはAPIキー欄が必須です。その場合は`local`など任意の文字列を入力してください。既定設定では値を検証しません。
 
-The examples below use UTF-8 and work with prompts in Japanese and other languages.
+以下の例はUTF-8を使用するため、日本語を含む任意の言語のプロンプトを送信できます。
 
-## Health and model discovery
+## ヘルスチェックとモデル一覧
 
 ```powershell
 Invoke-RestMethod http://127.0.0.1:8080/health
@@ -27,7 +26,7 @@ Invoke-RestMethod http://127.0.0.1:8080/v1/models
 ```powershell
 curl.exe http://127.0.0.1:8080/v1/chat/completions `
   -H "Content-Type: application/json; charset=utf-8" `
-  --data-binary '{"model":"qwen3.5-4b-local","messages":[{"role":"user","content":"Hello"}],"max_tokens":128}'
+  --data-binary '{"model":"qwen3.5-4b-local","messages":[{"role":"user","content":"こんにちは"}],"max_tokens":128}'
 ```
 
 ## PowerShell
@@ -62,7 +61,7 @@ const client = new OpenAI({
 
 const response = await client.chat.completions.create({
   model: "qwen3.5-4b-local",
-  messages: [{ role: "user", content: "Hello" }],
+  messages: [{ role: "user", content: "こんにちは" }],
   max_tokens: 128,
 });
 
@@ -81,14 +80,14 @@ client = OpenAI(
 
 response = client.chat.completions.create(
     model="qwen3.5-4b-local",
-    messages=[{"role": "user", "content": "Hello"}],
+    messages=[{"role": "user", "content": "こんにちは"}],
     max_tokens=128,
 )
 
 print(response.choices[0].message.content)
 ```
 
-## Generic OpenAI-compatible client
+## OpenAI互換クライアント共通設定
 
 ```text
 Provider: OpenAI compatible / Custom OpenAI
@@ -97,12 +96,8 @@ API key:  local
 Model ID: qwen3.5-4b-local
 ```
 
-## Security
+## セキュリティ
 
-The default endpoint has no authentication or TLS and is bound to loopback only.
-Do not change `Server.Host` to a LAN or public address unless you place an
-authenticated reverse proxy in front of it and configure firewall rules.
+既定のAPIには認証とTLSがなく、ループバックだけで待ち受けます。認証付きリバースプロキシとファイアウォールを自分で構成しない限り、`Server.Host`をLANや外部向けのアドレスへ変更しないでください。
 
-The exact set of optional endpoints depends on the installed `llama.cpp` release
-and model. `llmini` actively uses `/health`, `/v1/models`, and
-`/v1/chat/completions`.
+利用可能な追加エンドポイントは、導入された`llama.cpp`の版とモデルによって変わります。`llmini`が実際に利用するのは`/health`、`/v1/models`、`/v1/chat/completions`です。

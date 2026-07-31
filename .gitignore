@@ -3,8 +3,9 @@
 /models/
 /logs/
 /state/
-*.tmp
+*.gguf
 *.partial
+*.tmp
 *.log
 .vscode/
 .idea/
