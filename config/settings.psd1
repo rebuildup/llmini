@@ -5,7 +5,7 @@
         FileName      = "Qwen3.5-4B-Q6_K.gguf"
         Url           = "https://huggingface.co/lmstudio-community/Qwen3.5-4B-GGUF/resolve/main/Qwen3.5-4B-Q6_K.gguf?download=true"
         Sha256        = ""
-        ContextLength = 16384
+        ContextLength = 65536
         MaxTokens     = 2048
     }
 
