@@ -27,14 +27,10 @@ Write-Host ("  Gateway:   {0}" -f $gatewayUrl)
 Write-Host ("  UI assets: {0}" -f $controlUiIndex)
 
 if (-not (Test-Path -LiteralPath $controlUiIndex)) {
-    Write-Warning (
-        "OpenClaw Control UI assets are missing. The gateway may run while the browser UI remains unavailable. " +
-        "Reinstall OpenClaw with install scripts enabled."
-    )
+    throw "OpenClaw Control UI assets are missing. Reinstall OpenClaw with install scripts enabled."
 }
-else {
-    Write-Host "  UI assets: present"
-}
+
+Write-Host "  UI assets: present"
 
 Write-Host ""
 Write-Host "Gateway RPC probe"
@@ -50,35 +46,40 @@ if ($LASTEXITCODE -ne 0) {
 
 Write-Host ""
 Write-Host "Dashboard HTTP probe"
-try {
-    $response = Invoke-WebRequest `
-        -UseBasicParsing `
-        -Uri $dashboardUrl `
-        -TimeoutSec 10
+$response = Invoke-WebRequest `
+    -UseBasicParsing `
+    -Uri $dashboardUrl `
+    -TimeoutSec 10
 
-    Write-Host ("  HTTP status: {0}" -f [int]$response.StatusCode)
-    Write-Host ("  Content-Type: {0}" -f $response.Headers["Content-Type"])
+Write-Host ("  HTTP status: {0}" -f [int]$response.StatusCode)
+Write-Host ("  Content-Type: {0}" -f $response.Headers["Content-Type"])
 
-    if ([int]$response.StatusCode -ne 200) {
-        throw ("Unexpected dashboard HTTP status: {0}" -f $response.StatusCode)
-    }
+if ([int]$response.StatusCode -ne 200) {
+    throw ("Unexpected dashboard HTTP status: {0}" -f $response.StatusCode)
 }
-catch {
-    throw ("OpenClaw dashboard probe failed: {0}" -f $_.Exception.Message)
-}
+
+# OpenClaw imports a shared token from the URL fragment into the current tab.
+# URL fragments are not sent to the HTTP server.
+$encodedToken = [System.Uri]::EscapeDataString(
+    [string]$secrets.OpenClawGatewayToken
+)
+$authenticatedDashboardUrl = "{0}#token={1}" -f $dashboardUrl, $encodedToken
+
+Write-Host ""
+Write-Host "Authentication bootstrap"
+Write-Host "  Gateway token: available"
+Write-Host "  Dashboard URL: token included in URL fragment"
 
 if ($OpenBrowser) {
     $clipboard = Get-Command Set-Clipboard -ErrorAction SilentlyContinue
+
     if ($clipboard) {
         Set-Clipboard -Value $secrets.OpenClawGatewayToken
-        Write-Host "Gateway token copied to the clipboard."
-    }
-    else {
-        Write-Host ("Gateway token: {0}" -f $secrets.OpenClawGatewayToken)
+        Write-Host "  Backup token copied to the clipboard."
     }
 
-    Start-Process $dashboardUrl
-    Write-Host "Opened the OpenClaw Control UI. Paste the gateway token if requested."
+    Start-Process $authenticatedDashboardUrl
+    Write-Host "  Opened the authenticated OpenClaw Control UI."
 }
 
 Write-Host ""
